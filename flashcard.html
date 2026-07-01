@@ -123,15 +123,30 @@
 </div>
 
 <script>
-let deck = [
-  {word:"serendipity", pron:"/ˌser.ənˈdɪp.ə.ti/", pos:"명사", meaning:"뜻밖의 좋은 발견, 우연한 행운", example:"Finding this cafe was pure serendipity."},
-  {word:"ubiquitous", pron:"/juːˈbɪk.wɪ.təs/", pos:"형용사", meaning:"어디에나 있는, 편재하는", example:"Smartphones are ubiquitous now."},
-  {word:"resilient", pron:"/rɪˈzɪl.i.ənt/", pos:"형용사", meaning:"회복력 있는, 탄력적인", example:"She remained resilient after setbacks."},
-];
+let deck = [];
 let cur = 0, todayCount = 0, correctCount = 0;
 
 const card=document.getElementById("card");
 function renderCard(){
+  if(deck.length===0){
+    card.classList.remove("flipped");
+    document.getElementById("frontTag").textContent = "카드 없음";
+    document.getElementById("frontWord").textContent = "아직 단어가 없어요";
+    document.getElementById("frontMeta").textContent = "📷 사진으로 단어 추가로 시작해보세요";
+    document.getElementById("backMeaning").textContent = "";
+    document.getElementById("backExample").textContent = "";
+    card.style.cursor="default";
+    document.getElementById("knowBtn").disabled=true;
+    document.getElementById("dontKnowBtn").disabled=true;
+    document.getElementById("knowBtn").style.opacity=.4;
+    document.getElementById("dontKnowBtn").style.opacity=.4;
+    return;
+  }
+  card.style.cursor="pointer";
+  document.getElementById("knowBtn").disabled=false;
+  document.getElementById("dontKnowBtn").disabled=false;
+  document.getElementById("knowBtn").style.opacity=1;
+  document.getElementById("dontKnowBtn").style.opacity=1;
   const c = deck[cur % deck.length];
   card.classList.remove("flipped");
   document.getElementById("frontTag").textContent = `영단어 · ${cur+1}/${deck.length}`;
@@ -140,7 +155,7 @@ function renderCard(){
   document.getElementById("backMeaning").textContent = c.meaning || "뜻을 아직 몰라요 — 직접 입력해보세요";
   document.getElementById("backExample").textContent = c.example ? "예문: "+c.example : "";
 }
-card.onclick=()=>card.classList.toggle("flipped");
+card.onclick=()=>{ if(deck.length) card.classList.toggle("flipped"); };
 
 function nextCard(known){
   todayCount++;

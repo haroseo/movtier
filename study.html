@@ -130,7 +130,10 @@
   <div id="body">
     <div id="view">
       <div id="noteEditor" contenteditable="true"></div>
-      <div id="graphWrap" style="display:none;"><svg></svg></div>
+      <div id="graphWrap" style="display:none;">
+        <svg></svg>
+        <div id="graphEmpty" style="position:absolute;inset:0;display:none;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;pointer-events:none;">동기화된 노트가 없어요.<br>노트를 만들고 동기화를 켜면 여기에 노드로 나타나요.</div>
+      </div>
     </div>
     <div id="linked">
       <div class="h">🔗 연결된 마인드맵 노드</div>
@@ -174,16 +177,17 @@ function jaccard(a,b){
   return inter/new Set([...sa,...sb]).size;
 }
 
-let notes = [
-  {id:"note0", title:"브랜드 아이덴티티 리서치", body:"온니디자인 레퍼런스를 참고해 로고 방향을 정리했다. 컬러는 코어/포인트/무드로 나눈다.", synced:true},
-  {id:"note1", title:"타이포그래피 스터디", body:"Pretendard와 Inter를 함께 써서 가독성을 높인다.", synced:true},
-];
-let selectedNote = notes[0].id;
+let notes = [];
+let selectedNote = null;
 let nodes=[], links=[], idSeq=0;
 
 function renderNoteList(){
   const list=document.getElementById("noteList");
   list.innerHTML="";
+  if(notes.length===0){
+    list.innerHTML=`<div style="font-size:12px;color:var(--muted);padding:8px 2px;">아직 노트가 없어요.<br>아래에서 새 노트를 만들거나 사진으로 추가해보세요.</div>`;
+    return;
+  }
   notes.forEach(n=>{
     const el=document.createElement("div");
     el.className="noteItem"+(n.id===selectedNote?" sel":"");
@@ -200,9 +204,21 @@ function saveCurrentNote(){
 }
 function loadNote(){
   const n = notes.find(n=>n.id===selectedNote);
-  if(!n) return;
-  document.getElementById("noteTitle").value = n.title;
-  document.getElementById("noteEditor").innerText = n.body;
+  const titleInput = document.getElementById("noteTitle");
+  const editor = document.getElementById("noteEditor");
+  if(!n){
+    titleInput.value="";
+    titleInput.placeholder="+ 새 노트를 만들어보세요";
+    editor.innerText="";
+    editor.contentEditable="false";
+    document.getElementById("syncBtn").classList.remove("on");
+    renderNoteList();
+    document.getElementById("chips").innerHTML=`<div style="font-size:12px;color:var(--muted)">노트를 만들면 여기에 연결된 마인드맵 노드가 표시돼요.</div>`;
+    return;
+  }
+  editor.contentEditable="true";
+  titleInput.value = n.title;
+  editor.innerText = n.body;
   document.getElementById("syncBtn").classList.toggle("on", n.synced);
   renderNoteList();
   renderChips(n);
@@ -284,6 +300,7 @@ function ticked(){
 }
 function renderGraph(){
   resize();
+  document.getElementById("graphEmpty").style.display = nodes.length===0 ? "flex" : "none";
   sim.force("center").x(width/2).y(height/2);
   linkSel=g.select("g:nth-child(1)").selectAll("line").data(links,d=>(d.source.id||d.source)+"-"+(d.target.id||d.target));
   linkSel.exit().remove();
