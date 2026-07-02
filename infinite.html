@@ -67,6 +67,17 @@
   #ctxMenu .ctxItem.danger:hover{background:var(--red-bg);color:var(--red);}
   #ctxMenu .ctxSep{height:1px;background:var(--border);margin:4px 2px;}
 
+  #fileMenu{position:absolute;top:56px;left:20px;z-index:200;background:var(--panel);border:1px solid var(--border);
+    border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.16);padding:6px;display:none;min-width:230px;}
+  #fileMenu.show{display:block;}
+  #fileMenu .ctxItem{padding:9px 12px;border-radius:7px;font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--text);}
+  #fileMenu .ctxItem:hover{background:var(--violet-bg);color:var(--violet);}
+  #fileMenu .ctxSep{height:1px;background:var(--border);margin:4px 2px;}
+
+  #dropOverlay{position:absolute;inset:0;background:rgba(108,92,231,0.08);border:2px dashed var(--violet);
+    display:none;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:var(--violet);z-index:60;pointer-events:none;}
+  #dropOverlay.show{display:flex;}
+
   #shortcutPanel{position:absolute;top:70px;right:20px;background:var(--panel);border:1px solid var(--border);
     border-radius:12px;padding:18px;box-shadow:0 8px 24px rgba(0,0,0,.12);display:none;z-index:50;width:250px;}
   #shortcutPanel.show{display:block;}
@@ -128,7 +139,7 @@
 <body data-theme="light">
 
 <div id="topbar">
-  <div class="brand"><span class="dot"></span>무한증식</div>
+  <div class="brand" id="fileMenuBtn" style="cursor:pointer;">☰ 무한증식</div>
   <button class="pill ghost" id="queueBtn">📋 탐색 대기 <span id="queueBadge">0</span></button>
   <input id="kwInput" placeholder="키워드를 입력하면 위키백과를 따라 최대 1만 개까지 확장돼요… (Enter)">
   <div class="toggle">자동 확장 <div class="switch on" id="autoSwitch"><div class="knob"></div></div></div>
@@ -136,6 +147,15 @@
   <button class="pill ghost" id="shortcutBtn">⌨ 단축키</button>
   <button id="settingsBtn">⚙</button>
 </div>
+
+<div id="fileMenu">
+  <div class="ctxItem" id="fmNew">🆕 새로 시작 (전체 초기화)</div>
+  <div class="ctxItem" id="fmExport">💾 파일로 저장 (.json 내보내기)</div>
+  <div class="ctxItem" id="fmImport">📂 파일 불러오기</div>
+  <div class="ctxSep"></div>
+  <div class="ctxItem" style="cursor:default;color:var(--muted);font-size:11px;">또는 파일을 캔버스에 끌어다 놓아도 돼요</div>
+</div>
+<input type="file" id="fileImportInput" accept=".json,.txt,.csv" style="display:none;">
 
 <div id="body">
   <div id="queuePanel">
@@ -150,10 +170,12 @@
 
   <div id="canvasWrap">
     <canvas id="canvas"></canvas>
+    <div id="dropOverlay">📂 여기에 파일을 놓으면 불러와요</div>
     <div id="emptyHint">키워드를 입력하면 위키백과를 따라 자동으로 그래프가 자라나요.<br>노드를 클릭하면 요약·출처를 볼 수 있어요.</div>
     <div id="activityLog"></div>
     <div id="statusBar">
       <div id="statusText"><span class="spinner" id="spinner" style="display:none;"></span><span id="statusMsg">대기 중</span></div>
+      <div id="zoomLabel" style="font-size:11px;color:var(--muted);">100%</div>
       <div id="activityToggle">📜 최근 활동</div>
       <div id="progressWrap">
         <div id="progressTrack"><div id="progressFill"></div></div>
@@ -189,9 +211,16 @@
   </div>
   <h4>강조 색상</h4>
   <div class="swatchRow" id="swatchRow"></div>
-  <h4>확장 속도</h4>
+  <h4>배경</h4>
+  <div class="themeRow" style="margin-bottom:0;">
+    <button data-bg-opt="none" class="active">없음</button>
+    <button data-bg-opt="dot">점 그리드</button>
+    <button data-bg-opt="line">라인 그리드</button>
+  </div>
+  <h4 style="margin-top:16px;">확장 속도</h4>
   <input type="range" id="speedSlider" min="300" max="3000" value="900" style="width:100%;">
 </div>
+
 
 <div id="shortcutPanel">
   <h4>⌨ 단축키</h4>
@@ -274,12 +303,46 @@ const sim = d3.forceSimulation(nodes)
 function colorFor(node, cssVar){
   return getComputedStyle(document.body).getPropertyValue(cssVar).trim();
 }
+let bgStyle = localStorage.getItem("mindweb_infinite_bg") || "none";
+function drawGrid(){
+  if(bgStyle==="none") return;
+  const border = colorFor(null,"--border");
+  const spacing = 32;
+  ctx.save();
+  ctx.globalAlpha = 0.7;
+  if(bgStyle==="dot"){
+    ctx.fillStyle = border;
+    const startX = Math.floor((-transform.x/transform.k)/spacing)*spacing;
+    const startY = Math.floor((-transform.y/transform.k)/spacing)*spacing;
+    const endX = startX + (width/transform.k) + spacing;
+    const endY = startY + (height/transform.k) + spacing;
+    const r = 1.2/transform.k;
+    for(let x=startX; x<endX; x+=spacing){
+      for(let y=startY; y<endY; y+=spacing){
+        ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+      }
+    }
+  } else if(bgStyle==="line"){
+    ctx.strokeStyle = border;
+    ctx.lineWidth = 1/transform.k;
+    const startX = Math.floor((-transform.x/transform.k)/spacing)*spacing;
+    const startY = Math.floor((-transform.y/transform.k)/spacing)*spacing;
+    const endX = startX + (width/transform.k) + spacing;
+    const endY = startY + (height/transform.k) + spacing;
+    ctx.beginPath();
+    for(let x=startX; x<endX; x+=spacing){ ctx.moveTo(x,startY); ctx.lineTo(x,endY); }
+    for(let y=startY; y<endY; y+=spacing){ ctx.moveTo(startX,y); ctx.lineTo(endX,y); }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
 function draw(){
   ctx.save();
   ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,width,height);
   ctx.translate(transform.x, transform.y);
   ctx.scale(transform.k, transform.k);
+  drawGrid();
 
   const violet = colorFor(null,"--violet"), gold = colorFor(null,"--gold"), red = colorFor(null,"--red"), text = colorFor(null,"--text");
   const showLabels = transform.k > 0.7;
@@ -320,7 +383,11 @@ function draw(){
 }
 
 d3.select(canvas).call(
-  d3.zoom().scaleExtent([.05,4]).on("zoom", (e)=>{ transform = e.transform; draw(); })
+  d3.zoom().scaleExtent([.05,4]).on("zoom", (e)=>{
+    transform = e.transform;
+    document.getElementById("zoomLabel").textContent = Math.round(transform.k*100)+"%";
+    draw();
+  })
 );
 
 function nodeAt(px,py){
@@ -405,6 +472,7 @@ function addNode(label, ref, parentId){
   document.getElementById("emptyHint").style.display="none";
   updateProgress();
   logActivity(`${ref?"🟡 레퍼런스 추가":"🟣 키워드 추가"} · ${label}`);
+  dirty = true;
   return node;
 }
 
@@ -450,11 +518,13 @@ async function expand(node){
   }
   renderQueueList();
   setStatus(paused ? "일시정지됨" : "대기 중", false);
+  dirty = true;
   return added;
 }
 
 function pickIdleContinuation(){
-  // prefer a node we haven't expanded yet; fall back to any node (re-expanding is fine, addNode dedupes titles)
+  // prefer a node we haven't expanded yet so the chain keeps reaching new territory;
+  // once everything's been explored at least once, just keep cycling through the graph
   const unexplored = nodes.filter(n=>!explored.has(n.id));
   const pool = unexplored.length ? unexplored : nodes;
   if(pool.length===0) return null;
@@ -467,19 +537,12 @@ async function loop(){
     if(!document.getElementById("autoSwitch").classList.contains("on")){ setStatus("자동 확장이 꺼져있어요", false); await sleep(300); continue; }
     if(nodes.length>=MAX_NODES){ setStatus("최대 노드 수(10,000개)에 도달했어요", false); await sleep(500); continue; }
     if(queue.length===0){
-      if(nodes.length>0 && (Date.now()-lastActivityTime > IDLE_MS)){
-        const pick = pickIdleContinuation();
-        if(pick){
-          setStatus(`새 키워드가 없어서 "${pick.label}"와 비슷한 항목으로 계속 확장할게요`, true);
-          logActivity(`⏳ 유휴 자동 계속 · ${pick.label}`);
-          lastActivityTime = Date.now();
-          await sleep(600);
-          await expand(pick);
-          continue;
-        }
-      }
-      setStatus("탐색 대기 중 — 새 키워드를 기다리는 중", false);
-      await sleep(300); continue;
+      if(nodes.length===0){ setStatus("키워드를 입력해서 시작해보세요", false); await sleep(400); continue; }
+      // never stall: immediately pick something related from the existing graph and keep growing
+      const pick = pickIdleContinuation();
+      if(!pick){ await sleep(400); continue; }
+      queue.push(pick);
+      logActivity(`♻️ 계속 확장 · ${pick.label}`);
     }
     const next=queue.shift();
     renderQueueList();
@@ -490,6 +553,39 @@ async function loop(){
   }
 }
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+/* ---------- persistence: autosave graph like a file, restore on return ---------- */
+const LS_GRAPH = "mindweb_infinite_graph";
+let dirty = false;
+function saveGraphToStorage(){
+  const payload = {
+    idSeq,
+    nodes: nodes.map(n=>({id:n.id, label:n.label, keywords:n.keywords, ref:n.ref, x:n.x, y:n.y})),
+    links: links.map(l=>({source:(l.source.id||l.source), target:(l.target.id||l.target), ref:l.ref})),
+    queue: queue.map(n=>n.id),
+    explored: [...explored],
+  };
+  try{ localStorage.setItem(LS_GRAPH, JSON.stringify(payload)); }catch(e){ /* storage full — ignore */ }
+}
+function loadGraphFromStorage(){
+  try{
+    const raw = JSON.parse(localStorage.getItem(LS_GRAPH) || "null");
+    if(!raw || !raw.nodes || !raw.nodes.length) return false;
+    nodes = raw.nodes;
+    links = raw.links;
+    idSeq = raw.idSeq || nodes.length;
+    explored = new Set(raw.explored || []);
+    const byId = Object.fromEntries(nodes.map(n=>[n.id,n]));
+    queue = (raw.queue||[]).map(id=>byId[id]).filter(Boolean);
+    sim.nodes(nodes); sim.force("link").links(links); sim.alpha(0.5).restart();
+    document.getElementById("emptyHint").style.display="none";
+    updateProgress(); renderQueueList();
+    logActivity("📂 이전 세션에서 그래프를 불러왔어요");
+    return true;
+  }catch(e){ return false; }
+}
+setInterval(()=>{ if(dirty){ saveGraphToStorage(); dirty=false; } }, 3000);
+window.addEventListener("beforeunload", saveGraphToStorage);
 
 /* ---------- queue / exclusion panel ---------- */
 function renderQueueList(){
@@ -597,6 +693,7 @@ function deleteNode(node){
   logActivity(`🗑 삭제됨 · ${node.label}`);
   if(selectedNode===node){ selectedNode=null; document.getElementById("detailPanel").classList.remove("show"); }
   if(nodes.length===0) document.getElementById("emptyHint").style.display="flex";
+  dirty = true;
   draw();
 }
 
@@ -698,10 +795,111 @@ accents.forEach((c,i)=>{
   };
   swatchRow.appendChild(s);
 });
+document.querySelectorAll("[data-bg-opt]").forEach(btn=>{
+  if(btn.dataset.bgOpt===bgStyle) btn.classList.add("active"); else btn.classList.remove("active");
+  btn.onclick=()=>{
+    document.querySelectorAll("[data-bg-opt]").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    bgStyle = btn.dataset.bgOpt;
+    localStorage.setItem("mindweb_infinite_bg", bgStyle);
+    draw();
+  };
+});
+
+/* ---------- file menu: export / import / new (Figma-style "File" menu) ---------- */
+const fileMenu = document.getElementById("fileMenu");
+const fileMenuBtn = document.getElementById("fileMenuBtn");
+fileMenuBtn.onclick=(e)=>{ e.stopPropagation(); fileMenu.classList.toggle("show"); };
+document.addEventListener("click", e=>{ if(!fileMenu.contains(e.target) && e.target!==fileMenuBtn) fileMenu.classList.remove("show"); });
+
+document.getElementById("fmNew").onclick=()=>{
+  fileMenu.classList.remove("show");
+  if(nodes.length && !confirm("전체 그래프를 초기화할까요? 저장된 내용도 함께 사라져요.")) return;
+  nodes=[]; links=[]; queue=[]; explored=new Set(); selectedNode=null; idSeq=0;
+  sim.nodes(nodes); sim.force("link").links(links);
+  localStorage.removeItem(LS_GRAPH);
+  document.getElementById("emptyHint").style.display="flex";
+  document.getElementById("detailPanel").classList.remove("show");
+  updateProgress(); renderQueueList(); draw();
+};
+
+document.getElementById("fmExport").onclick=()=>{
+  fileMenu.classList.remove("show");
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    nodes: nodes.map(n=>({id:n.id, label:n.label, keywords:n.keywords, ref:n.ref})),
+    links: links.map(l=>({source:(l.source.id||l.source), target:(l.target.id||l.target), ref:l.ref})),
+  };
+  const blob = new Blob([JSON.stringify(payload,null,2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `mindweb-infinite-${Date.now()}.json`;
+  a.click();
+};
+
+document.getElementById("fmImport").onclick=()=>{
+  fileMenu.classList.remove("show");
+  document.getElementById("fileImportInput").click();
+};
+document.getElementById("fileImportInput").addEventListener("change", e=>{
+  const file = e.target.files[0];
+  if(file) importFile(file);
+  e.target.value="";
+});
+
+async function importFile(file){
+  const text = await file.text();
+  if(file.name.endsWith(".json")){
+    try{
+      const data = JSON.parse(text);
+      if(data.nodes && data.links){
+        // merge: re-add nodes/links with fresh ids to avoid collisions
+        const idMap = {};
+        data.nodes.forEach(n=>{
+          const created = addNode(n.label, !!n.ref, null);
+          if(created) idMap[n.id] = created.id;
+        });
+        data.links.forEach(l=>{
+          const s = idMap[l.source], t = idMap[l.target];
+          if(s && t) links.push({source:s, target:t, ref:!!l.ref});
+        });
+        sim.force("link").links(links);
+        sim.alpha(0.6).restart();
+        logActivity(`📂 파일에서 ${data.nodes.length}개 노드 불러옴`);
+        dirty = true;
+        return;
+      }
+    }catch(e){ /* fall through to line-based parsing */ }
+  }
+  // treat as a plain keyword list — one keyword per line
+  const lines = text.split("\n").map(l=>l.trim()).filter(Boolean);
+  lines.forEach(line=>{
+    const n = addNode(line, false, null);
+    if(n){ queue.push(n); lastActivityTime=Date.now(); }
+  });
+  renderQueueList();
+  logActivity(`📂 파일에서 키워드 ${lines.length}개 추가됨`);
+}
+
+const canvasWrap = document.getElementById("canvasWrap");
+const dropOverlay = document.getElementById("dropOverlay");
+["dragenter","dragover"].forEach(evt=>{
+  canvasWrap.addEventListener(evt, e=>{ e.preventDefault(); dropOverlay.classList.add("show"); });
+});
+["dragleave","drop"].forEach(evt=>{
+  canvasWrap.addEventListener(evt, e=>{ e.preventDefault(); if(evt==="dragleave" && e.target!==canvasWrap) return; dropOverlay.classList.remove("show"); });
+});
+canvasWrap.addEventListener("drop", e=>{
+  e.preventDefault();
+  dropOverlay.classList.remove("show");
+  const file = e.dataTransfer.files[0];
+  if(file) importFile(file);
+});
 
 resize();
 renderExcludeChips();
 renderQueueList();
+const restored = loadGraphFromStorage();
 updateProgress();
 renderActivityLog();
 loop();
