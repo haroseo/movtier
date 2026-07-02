@@ -38,6 +38,24 @@
   #body{flex:1;display:flex;min-height:0;position:relative;}
   #canvasWrap{flex:1;position:relative;}
   canvas{width:100%;height:100%;display:block;cursor:grab;}
+  #statusBar{position:absolute;bottom:20px;left:20px;right:20px;background:var(--panel);border:1px solid var(--border);
+    border-radius:12px;padding:12px 18px;display:flex;align-items:center;gap:16px;box-shadow:0 4px 14px rgba(0,0,0,.06);}
+  #statusText{font-size:12.5px;color:var(--text);flex:1;display:flex;align-items:center;gap:8px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+  .spinner{width:12px;height:12px;border-radius:50%;border:2px solid var(--border);border-top-color:var(--violet);
+    animation:spin .8s linear infinite;flex-shrink:0;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  #progressWrap{width:180px;flex-shrink:0;}
+  #progressTrack{width:100%;height:6px;border-radius:3px;background:var(--border);overflow:hidden;}
+  #progressFill{height:100%;background:var(--violet);width:0%;transition:width .3s;}
+  #progressLabel{font-size:10.5px;color:var(--muted);margin-top:4px;text-align:right;}
+  #activityToggle{font-size:11.5px;color:var(--muted);cursor:pointer;white-space:nowrap;flex-shrink:0;}
+  #activityLog{position:absolute;bottom:66px;left:20px;right:20px;max-height:180px;overflow-y:auto;
+    background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px 14px;display:none;
+    box-shadow:0 4px 14px rgba(0,0,0,.06);}
+  #activityLog.show{display:block;}
+  .logItem{font-size:11.5px;color:var(--muted);padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:10px;}
+  .logItem:last-child{border-bottom:none;}
+  .logItem b{color:var(--text);font-weight:600;}
   #emptyHint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     color:var(--muted);font-size:13.5px;text-align:center;pointer-events:none;padding:0 20px;}
 
@@ -117,6 +135,15 @@
   <div id="canvasWrap">
     <canvas id="canvas"></canvas>
     <div id="emptyHint">키워드를 입력하면 위키백과를 따라 자동으로 그래프가 자라나요.<br>노드를 클릭하면 요약·출처를 볼 수 있어요.</div>
+    <div id="activityLog"></div>
+    <div id="statusBar">
+      <div id="statusText"><span class="spinner" id="spinner" style="display:none;"></span><span id="statusMsg">대기 중</span></div>
+      <div id="activityToggle">📜 최근 활동</div>
+      <div id="progressWrap">
+        <div id="progressTrack"><div id="progressFill"></div></div>
+        <div id="progressLabel">0 / 10,000 노드</div>
+      </div>
+    </div>
   </div>
 
   <div id="detailPanel">
@@ -274,6 +301,30 @@ canvas.addEventListener("click", (e)=>{
   if(n) selectNode(n);
 });
 
+/* ---------- status / progress / activity log ---------- */
+let activityLog = [];
+function setStatus(msg, spinning){
+  document.getElementById("statusMsg").textContent = msg;
+  document.getElementById("spinner").style.display = spinning ? "inline-block" : "none";
+}
+function updateProgress(){
+  const pct = Math.min(100, (nodes.length/MAX_NODES*100));
+  document.getElementById("progressFill").style.width = pct.toFixed(2)+"%";
+  document.getElementById("progressLabel").textContent = `${nodes.length.toLocaleString()} / ${MAX_NODES.toLocaleString()} 노드 (${pct.toFixed(1)}%)`;
+}
+function logActivity(msg){
+  activityLog.unshift({msg, t: new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'})});
+  activityLog = activityLog.slice(0,40);
+  renderActivityLog();
+}
+function renderActivityLog(){
+  const box = document.getElementById("activityLog");
+  box.innerHTML = activityLog.map(a=>`<div class="logItem"><b>${a.msg}</b><span>${a.t}</span></div>`).join("") || `<div class="logItem">아직 활동이 없어요.</div>`;
+}
+document.getElementById("activityToggle").onclick=()=>{
+  document.getElementById("activityLog").classList.toggle("show");
+};
+
 /* ---------- node creation ---------- */
 function addNode(label, ref, parentId){
   if(nodes.length>=MAX_NODES) return null;
@@ -293,28 +344,35 @@ function addNode(label, ref, parentId){
   sim.nodes(nodes); sim.force("link").links(links);
   sim.alpha(Math.max(sim.alpha(),0.4)).restart();
   document.getElementById("emptyHint").style.display="none";
+  updateProgress();
+  logActivity(`${ref?"🟡 레퍼런스 추가":"🟣 키워드 추가"} · ${label}`);
   return node;
 }
 
 async function fetchWikiRelated(term){
+  setStatus(`"${term}" 관련 항목 검색 중…`, true);
   try{
     const url=`https://ko.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(term)}&limit=5&namespace=0&format=json&origin=*`;
     const res=await fetch(url);
     const data=await res.json();
     return (data[1]||[]).filter(t=>t.toLowerCase()!==term.toLowerCase());
   }catch(e){
+    setStatus(`네트워크 지연 — "${term}" 로컬 연관어로 대체`, false);
     const pool=new Set(); nodes.forEach(n=>n.keywords.forEach(k=>pool.add(k)));
     return [...pool].slice(0,3);
   }
 }
 async function fetchSummary(title){
+  setStatus(`"${title}" 요약 불러오는 중…`, true);
   try{
     const url = `https://ko.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
     const res = await fetch(url);
     if(!res.ok) throw new Error("no summary");
     const data = await res.json();
+    setStatus("대기 중", false);
     return { extract: data.extract || "요약을 찾지 못했어요.", source: data.content_urls?.desktop?.page || null };
   }catch(e){
+    setStatus("대기 중", false);
     return { extract: "이 항목에 대한 요약을 찾지 못했어요.", source: null };
   }
 }
@@ -322,24 +380,29 @@ async function fetchSummary(title){
 async function expand(node){
   const related = await fetchWikiRelated(node.label);
   const added = [];
-  for(const title of related.slice(0,3)){
+  for(let i=0;i<Math.min(3,related.length);i++){
+    const title = related[i];
+    setStatus(`"${node.label}" 확장 중… (${i+1}/${Math.min(3,related.length)})`, true);
     if(isExcluded(title)) continue;
     if(reports[title] && reports[title].reported) continue; // skip flagged info
     const child = addNode(title, true, node.id);
     if(child){ queue.push(child); added.push(child); }
   }
   renderQueueList();
+  setStatus(paused ? "일시정지됨" : "대기 중", false);
   return added;
 }
 
 async function loop(){
   while(true){
-    if(paused || queue.length===0 || nodes.length>=MAX_NODES || !document.getElementById("autoSwitch").classList.contains("on")){
-      await sleep(300); continue;
-    }
+    if(paused){ setStatus("일시정지됨", false); await sleep(300); continue; }
+    if(!document.getElementById("autoSwitch").classList.contains("on")){ setStatus("자동 확장이 꺼져있어요", false); await sleep(300); continue; }
+    if(nodes.length>=MAX_NODES){ setStatus("최대 노드 수(10,000개)에 도달했어요", false); await sleep(500); continue; }
+    if(queue.length===0){ setStatus("탐색 대기 중 — 새 키워드를 기다리는 중", false); await sleep(300); continue; }
     const next=queue.shift();
     renderQueueList();
     const speed = +document.getElementById("speedSlider").value;
+    setStatus(`다음 확장까지 대기 중… "${next.label}"`, true);
     await sleep(speed);
     await expand(next);
   }
@@ -418,7 +481,7 @@ function bindReportHandlers(node){
     const text = document.getElementById("correctionText").value.trim();
     reports[node.label] = { reported:true, correction:text };
     saveReports(reports);
-    if(!exclusions.includes(node.label)){ /* keep node visible but flagged, don't auto-add duplicates elsewhere */ }
+    logActivity(`🚩 신고/수정됨 · ${node.label}`);
     selectNode(node);
     draw();
   };
@@ -474,6 +537,8 @@ accents.forEach((c,i)=>{
 resize();
 renderExcludeChips();
 renderQueueList();
+updateProgress();
+renderActivityLog();
 loop();
 </script>
 </body>

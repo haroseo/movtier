@@ -418,7 +418,9 @@ document.getElementById("deckFile").addEventListener("change", async (e)=>{
   const file=e.target.files[0];
   if(!file) return;
   const status=document.getElementById("fileStatus");
+  status.textContent="파일을 읽는 중…";
   const text = await file.text();
+  status.textContent="단어를 분석하는 중…";
   let words=[];
   try{
     if(file.name.endsWith(".json")){
