@@ -59,6 +59,21 @@
   #emptyHint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     color:var(--muted);font-size:13.5px;text-align:center;pointer-events:none;padding:0 20px;}
 
+  #ctxMenu{position:fixed;z-index:200;background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    box-shadow:0 8px 24px rgba(0,0,0,.16);padding:6px;display:none;min-width:190px;}
+  #ctxMenu.show{display:block;}
+  #ctxMenu .ctxItem{padding:9px 12px;border-radius:7px;font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--text);}
+  #ctxMenu .ctxItem:hover{background:var(--violet-bg);color:var(--violet);}
+  #ctxMenu .ctxItem.danger:hover{background:var(--red-bg);color:var(--red);}
+  #ctxMenu .ctxSep{height:1px;background:var(--border);margin:4px 2px;}
+
+  #shortcutPanel{position:absolute;top:70px;right:20px;background:var(--panel);border:1px solid var(--border);
+    border-radius:12px;padding:18px;box-shadow:0 8px 24px rgba(0,0,0,.12);display:none;z-index:50;width:250px;}
+  #shortcutPanel.show{display:block;}
+  #shortcutPanel h4{font-size:12px;color:var(--muted);margin-bottom:10px;}
+  .scRow{display:flex;justify-content:space-between;font-size:12px;margin-bottom:8px;}
+  .scRow kbd{background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:2px 7px;font-family:var(--font);font-size:11px;}
+
   #queuePanel{width:0;overflow:hidden;border-right:1px solid var(--border);background:var(--panel);
     transition:width .2s;display:flex;flex-direction:column;}
   #queuePanel.show{width:280px;}
@@ -118,6 +133,7 @@
   <input id="kwInput" placeholder="키워드를 입력하면 위키백과를 따라 최대 1만 개까지 확장돼요… (Enter)">
   <div class="toggle">자동 확장 <div class="switch on" id="autoSwitch"><div class="knob"></div></div></div>
   <button class="pill gold" id="pauseBtn">⏸ 일시정지</button>
+  <button class="pill ghost" id="shortcutBtn">⌨ 단축키</button>
   <button id="settingsBtn">⚙</button>
 </div>
 
@@ -177,6 +193,26 @@
   <input type="range" id="speedSlider" min="300" max="3000" value="900" style="width:100%;">
 </div>
 
+<div id="shortcutPanel">
+  <h4>⌨ 단축키</h4>
+  <div class="scRow"><span>선택 노드 삭제</span><kbd>Delete</kbd></div>
+  <div class="scRow"><span>패널 닫기 / 선택 해제</span><kbd>Esc</kbd></div>
+  <div class="scRow"><span>키워드 입력창 포커스</span><kbd>Ctrl/⌘ F</kbd></div>
+  <div class="scRow"><span>확대</span><kbd>+</kbd></div>
+  <div class="scRow"><span>축소</span><kbd>-</kbd></div>
+  <div class="scRow"><span>보기 초기화</span><kbd>0</kbd></div>
+  <div class="scRow"><span>노드 우클릭</span><kbd>메뉴 열기</kbd></div>
+  <div class="scRow"><span>노드 3연속 클릭</span><kbd>메뉴 열기</kbd></div>
+</div>
+
+<div id="ctxMenu">
+  <div class="ctxItem" id="ctxFindMore">🔎 여기서 더 찾기</div>
+  <div class="ctxItem" id="ctxEdit">✏️ 수정 요청하기</div>
+  <div class="ctxItem" id="ctxReport">🚩 오류 신고하기</div>
+  <div class="ctxSep"></div>
+  <div class="ctxItem danger" id="ctxDelete">🗑 노드 삭제</div>
+</div>
+
 <script>
 /* ---------- storage: reports / corrections / exclusions persist across sessions ---------- */
 const LS_REPORTS = "mindweb_infinite_reports";
@@ -208,6 +244,9 @@ function isExcluded(title){
 let nodes=[], links=[], idSeq=0, queue=[], paused=false;
 const MAX_NODES = 10000;
 let selectedNode = null;
+let explored = new Set();       // node ids already expanded at least once
+let lastActivityTime = Date.now();
+const IDLE_MS = 8000;           // if nothing happens for this long, auto-continue with a related keyword
 
 /* ---------- d3-force physics, canvas rendering (scales to thousands of nodes) ---------- */
 const canvas = document.getElementById("canvas");
@@ -295,10 +334,30 @@ function nodeAt(px,py){
   }
   return best;
 }
+let clickTracker = {node:null, count:0, timer:null};
 canvas.addEventListener("click", (e)=>{
   const rect = canvas.getBoundingClientRect();
   const n = nodeAt(e.clientX-rect.left, e.clientY-rect.top);
-  if(n) selectNode(n);
+  if(!n) return;
+  selectNode(n);
+  if(clickTracker.node===n){
+    clickTracker.count++;
+  } else {
+    clickTracker.node=n; clickTracker.count=1;
+  }
+  clearTimeout(clickTracker.timer);
+  clickTracker.timer = setTimeout(()=>{ clickTracker.node=null; clickTracker.count=0; }, 600);
+  if(clickTracker.count>=3){
+    e.stopPropagation();
+    openContextMenu(n, e.clientX, e.clientY);
+    clickTracker.count=0; clickTracker.node=null;
+  }
+});
+canvas.addEventListener("contextmenu", (e)=>{
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const n = nodeAt(e.clientX-rect.left, e.clientY-rect.top);
+  if(n){ selectNode(n); openContextMenu(n, e.clientX, e.clientY); }
 });
 
 /* ---------- status / progress / activity log ---------- */
@@ -378,6 +437,7 @@ async function fetchSummary(title){
 }
 
 async function expand(node){
+  explored.add(node.id);
   const related = await fetchWikiRelated(node.label);
   const added = [];
   for(let i=0;i<Math.min(3,related.length);i++){
@@ -386,11 +446,19 @@ async function expand(node){
     if(isExcluded(title)) continue;
     if(reports[title] && reports[title].reported) continue; // skip flagged info
     const child = addNode(title, true, node.id);
-    if(child){ queue.push(child); added.push(child); }
+    if(child){ queue.push(child); added.push(child); lastActivityTime=Date.now(); }
   }
   renderQueueList();
   setStatus(paused ? "일시정지됨" : "대기 중", false);
   return added;
+}
+
+function pickIdleContinuation(){
+  // prefer a node we haven't expanded yet; fall back to any node (re-expanding is fine, addNode dedupes titles)
+  const unexplored = nodes.filter(n=>!explored.has(n.id));
+  const pool = unexplored.length ? unexplored : nodes;
+  if(pool.length===0) return null;
+  return pool[Math.floor(Math.random()*pool.length)];
 }
 
 async function loop(){
@@ -398,7 +466,21 @@ async function loop(){
     if(paused){ setStatus("일시정지됨", false); await sleep(300); continue; }
     if(!document.getElementById("autoSwitch").classList.contains("on")){ setStatus("자동 확장이 꺼져있어요", false); await sleep(300); continue; }
     if(nodes.length>=MAX_NODES){ setStatus("최대 노드 수(10,000개)에 도달했어요", false); await sleep(500); continue; }
-    if(queue.length===0){ setStatus("탐색 대기 중 — 새 키워드를 기다리는 중", false); await sleep(300); continue; }
+    if(queue.length===0){
+      if(nodes.length>0 && (Date.now()-lastActivityTime > IDLE_MS)){
+        const pick = pickIdleContinuation();
+        if(pick){
+          setStatus(`새 키워드가 없어서 "${pick.label}"와 비슷한 항목으로 계속 확장할게요`, true);
+          logActivity(`⏳ 유휴 자동 계속 · ${pick.label}`);
+          lastActivityTime = Date.now();
+          await sleep(600);
+          await expand(pick);
+          continue;
+        }
+      }
+      setStatus("탐색 대기 중 — 새 키워드를 기다리는 중", false);
+      await sleep(300); continue;
+    }
     const next=queue.shift();
     renderQueueList();
     const speed = +document.getElementById("speedSlider").value;
@@ -491,6 +573,89 @@ document.getElementById("closeDetail").onclick=()=>{
   selectedNode=null; draw();
 };
 
+/* ---------- context menu (right-click / triple-click) ---------- */
+const ctxMenu = document.getElementById("ctxMenu");
+let ctxTarget = null;
+function openContextMenu(node, x, y){
+  ctxTarget = node;
+  ctxMenu.style.left = Math.min(x, window.innerWidth-210)+"px";
+  ctxMenu.style.top = Math.min(y, window.innerHeight-180)+"px";
+  ctxMenu.classList.add("show");
+}
+function closeContextMenu(){ ctxMenu.classList.remove("show"); ctxTarget=null; }
+document.addEventListener("click", e=>{ if(!ctxMenu.contains(e.target)) closeContextMenu(); });
+
+function deleteNode(node){
+  const idx = nodes.indexOf(node);
+  if(idx===-1) return;
+  nodes.splice(idx,1);
+  links = links.filter(l => (l.source.id||l.source)!==node.id && (l.target.id||l.target)!==node.id);
+  queue = queue.filter(n=>n.id!==node.id);
+  explored.delete(node.id);
+  sim.nodes(nodes); sim.force("link").links(links); sim.alpha(0.3).restart();
+  renderQueueList(); updateProgress();
+  logActivity(`🗑 삭제됨 · ${node.label}`);
+  if(selectedNode===node){ selectedNode=null; document.getElementById("detailPanel").classList.remove("show"); }
+  if(nodes.length===0) document.getElementById("emptyHint").style.display="flex";
+  draw();
+}
+
+document.getElementById("ctxFindMore").onclick = async ()=>{
+  if(!ctxTarget) return;
+  const target = ctxTarget; closeContextMenu();
+  logActivity(`🔎 수동으로 더 찾기 · ${target.label}`);
+  lastActivityTime = Date.now();
+  await expand(target);
+};
+document.getElementById("ctxEdit").onclick = async ()=>{
+  if(!ctxTarget) return;
+  const target = ctxTarget; closeContextMenu();
+  await selectNode(target);
+  document.getElementById("reportBtn").click();
+  document.getElementById("correctionText").focus();
+};
+document.getElementById("ctxReport").onclick = async ()=>{
+  if(!ctxTarget) return;
+  const target = ctxTarget; closeContextMenu();
+  reports[target.label] = reports[target.label] || { reported:true, correction:"" };
+  reports[target.label].reported = true;
+  saveReports(reports);
+  logActivity(`🚩 오류 신고됨 · ${target.label}`);
+  selectNode(target);
+  draw();
+};
+document.getElementById("ctxDelete").onclick = ()=>{
+  if(!ctxTarget) return;
+  const target = ctxTarget; closeContextMenu();
+  deleteNode(target);
+};
+
+/* ---------- keyboard shortcuts (Figma-style) ---------- */
+document.addEventListener("keydown", e=>{
+  const typing = ["INPUT","TEXTAREA"].includes(document.activeElement.tagName);
+  if((e.key==="Delete"||e.key==="Backspace") && selectedNode && !typing){
+    e.preventDefault(); deleteNode(selectedNode);
+  } else if(e.key==="Escape"){
+    closeContextMenu();
+    document.getElementById("detailPanel").classList.remove("show");
+    selectedNode=null; draw();
+  } else if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==="f"){
+    e.preventDefault(); document.getElementById("kwInput").focus();
+  } else if(!typing && (e.key==="+"||e.key==="=")){
+    d3.select(canvas).transition().duration(200).call(d3.zoom().scaleBy, 1.3);
+  } else if(!typing && e.key==="-"){
+    d3.select(canvas).transition().duration(200).call(d3.zoom().scaleBy, 0.75);
+  } else if(!typing && e.key==="0"){
+    d3.select(canvas).transition().duration(300).call(d3.zoom().transform, d3.zoomIdentity);
+  }
+});
+
+/* ---------- shortcuts help panel ---------- */
+const shortcutBtn=document.getElementById("shortcutBtn");
+const shortcutPanel=document.getElementById("shortcutPanel");
+shortcutBtn.onclick=()=>shortcutPanel.classList.toggle("show");
+document.addEventListener("click",e=>{ if(!shortcutPanel.contains(e.target) && e.target!==shortcutBtn) shortcutPanel.classList.remove("show"); });
+
 /* ---------- input / controls ---------- */
 document.getElementById("kwInput").addEventListener("keydown", e=>{
   if(e.key==="Enter"){
@@ -498,7 +663,7 @@ document.getElementById("kwInput").addEventListener("keydown", e=>{
     if(!val) return;
     e.target.value="";
     const n = addNode(val,false,null);
-    if(n){ queue.push(n); renderQueueList(); }
+    if(n){ queue.push(n); renderQueueList(); lastActivityTime=Date.now(); }
   }
 });
 document.getElementById("autoSwitch").onclick=(e)=>e.currentTarget.classList.toggle("on");

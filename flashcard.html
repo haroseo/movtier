@@ -52,25 +52,21 @@
   /* ---------- Study view ---------- */
   #studyView{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;gap:24px;position:relative;}
   #dueInfo{position:absolute;top:20px;left:26px;font-size:12px;color:var(--muted);}
-  #cardWrap{width:560px;max-width:88vw;height:320px;perspective:1200px;}
-  #card{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform .4s cubic-bezier(.2,.8,.3,1);cursor:pointer;}
-  #card.flipped{transform:rotateY(180deg);}
-  .face{position:absolute;inset:0;backface-visibility:hidden;border:1px solid var(--border);border-radius:20px;
-    background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:36px;}
-  .face.back{transform:rotateY(180deg);}
+  #cardWrap{width:560px;max-width:88vw;}
+  #card{width:100%;border:1px solid var(--border);border-radius:20px;background:var(--panel);
+    display:flex;flex-direction:column;align-items:center;gap:12px;padding:36px;}
   .tag{padding:6px 14px;border-radius:999px;background:var(--gold-bg);color:var(--gold);font-size:11px;font-weight:700;}
   .word{font-size:36px;font-weight:800;text-align:center;}
   .meta{font-size:12.5px;color:var(--muted);}
-  .hint{font-size:11px;color:var(--muted);margin-top:4px;}
-  .meaning{font-size:22px;font-weight:700;text-align:center;}
-  .example{font-size:12.5px;color:var(--muted);text-align:center;max-width:420px;}
-  #gradeRow{display:flex;gap:10px;width:560px;max-width:88vw;}
-  .gradebtn{flex:1;padding:14px 6px;border-radius:12px;border:none;font-weight:700;font-size:12.5px;cursor:pointer;font-family:var(--font);}
-  .gradebtn.again{background:var(--red-bg);color:var(--red);}
-  .gradebtn.hard{background:var(--gold-bg);color:var(--gold);}
-  .gradebtn.good{background:var(--blue-bg);color:var(--blue);}
-  .gradebtn.easy{background:var(--green-bg);color:var(--green);}
-  .gradebtn small{display:block;font-weight:400;opacity:.75;font-size:10px;margin-top:2px;}
+  .hint{font-size:11px;color:var(--muted);margin-top:2px;margin-bottom:6px;}
+  .example{font-size:12.5px;color:var(--muted);text-align:center;max-width:420px;margin-top:6px;}
+  #optionGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;}
+  .optBtn{padding:16px 14px;border-radius:12px;border:1.5px solid var(--border);background:var(--bg);
+    color:var(--text);font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font);text-align:left;transition:.15s;}
+  .optBtn:hover{border-color:var(--violet);}
+  .optBtn.correct{background:var(--green-bg);border-color:var(--green);color:var(--green);}
+  .optBtn.wrong{background:var(--red-bg);border-color:var(--red);color:var(--red);}
+  .optBtn.disabled{pointer-events:none;}
 
   #settingsPanel{position:absolute;top:78px;right:26px;background:var(--panel);border:1px solid var(--border);
     border-radius:12px;padding:18px;box-shadow:0 8px 24px rgba(0,0,0,.12);display:none;z-index:50;width:230px;}
@@ -119,23 +115,13 @@
   <div id="dueInfo"></div>
   <div id="cardWrap">
     <div id="card">
-      <div class="face front">
-        <div class="tag" id="frontTag"></div>
-        <div class="word" id="frontWord"></div>
-        <div class="meta" id="frontMeta"></div>
-        <div class="hint">카드를 클릭하면 뜻이 보여요</div>
-      </div>
-      <div class="face back">
-        <div class="meaning" id="backMeaning"></div>
-        <div class="example" id="backExample"></div>
-      </div>
+      <div class="tag" id="frontTag"></div>
+      <div class="word" id="frontWord"></div>
+      <div class="meta" id="frontMeta"></div>
+      <div class="hint">아래 4개 중 알맞은 뜻을 골라주세요</div>
+      <div id="optionGrid"></div>
+      <div id="exampleReveal" class="example" style="display:none;"></div>
     </div>
-  </div>
-  <div id="gradeRow">
-    <button class="gradebtn again" id="gAgain">다시<small>&lt;1분</small></button>
-    <button class="gradebtn hard" id="gHard">어려움<small>1일</small></button>
-    <button class="gradebtn good" id="gGood">보통<small>3일+</small></button>
-    <button class="gradebtn easy" id="gEasy">쉬움<small>6일+</small></button>
   </div>
 </div>
 
@@ -342,26 +328,75 @@ function updateDueInfo(){
 }
 
 const card=document.getElementById("card");
-card.onclick=()=>{ if(studyQueue.length) card.classList.toggle("flipped"); };
+
+// Build a global pool of meanings (for distractors) from every built-in word list
+const MEANING_POOL = [
+  ...Object.values(BUILTIN_DECKS).flatMap(d=>d.words.map(w=>w[3])),
+  ...BOOK_UNITS.flatMap(u=>u.words.map(w=>w[3])),
+];
+function shuffle(arr){
+  const a=arr.slice();
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+function buildOptions(word){
+  const correct = word.meaning || "뜻 없음";
+  const distractPool = shuffle(
+    currentWords.map(w=>w.meaning).filter(m=>m && m!==correct)
+  );
+  const seen = new Set([correct]);
+  const distractors = [];
+  for(const m of distractPool){
+    if(distractors.length>=3) break;
+    if(!seen.has(m)){ distractors.push(m); seen.add(m); }
+  }
+  if(distractors.length<3){
+    for(const m of shuffle(MEANING_POOL)){
+      if(distractors.length>=3) break;
+      if(!seen.has(m)){ distractors.push(m); seen.add(m); }
+    }
+  }
+  return shuffle([correct, ...distractors].map(text=>({text, correct: text===correct})));
+}
 
 function renderCard(){
   updateDueInfo();
+  document.getElementById("exampleReveal").style.display="none";
   if(studyQueue.length===0){
     document.getElementById("frontTag").textContent="완료";
     document.getElementById("frontWord").textContent="오늘 복습을 다 마쳤어요 🎉";
     document.getElementById("frontMeta").textContent="다른 덱을 선택하거나 나중에 다시 와주세요";
-    document.getElementById("backMeaning").textContent="";
-    document.getElementById("backExample").textContent="";
-    card.classList.remove("flipped");
+    document.getElementById("optionGrid").innerHTML="";
     return;
   }
   const w = currentWords[studyQueue[curIdx % studyQueue.length]];
-  card.classList.remove("flipped");
   document.getElementById("frontTag").textContent = w.unit ? w.unit : "영단어";
   document.getElementById("frontWord").textContent = w.word;
   document.getElementById("frontMeta").textContent = `${w.pron||""} ${w.pos?"· "+w.pos:""}`;
-  document.getElementById("backMeaning").textContent = w.meaning || "뜻 입력 필요";
-  document.getElementById("backExample").textContent = w.example ? "예문: "+w.example : "";
+  const grid = document.getElementById("optionGrid");
+  grid.innerHTML="";
+  const options = buildOptions(w);
+  options.forEach(opt=>{
+    const b = document.createElement("button");
+    b.className="optBtn";
+    b.textContent = opt.text;
+    b.onclick = ()=>answerSelected(opt, w, grid);
+    grid.appendChild(b);
+  });
+}
+
+function answerSelected(opt, w, grid){
+  [...grid.children].forEach(b=>b.classList.add("disabled"));
+  [...grid.children].forEach(b=>{ if(b.textContent===w.meaning) b.classList.add("correct"); });
+  if(!opt.correct){
+    [...grid.children].forEach(b=>{ if(b.textContent===opt.text) b.classList.add("wrong"); });
+  }
+  if(w.example){
+    const ex = document.getElementById("exampleReveal");
+    ex.textContent = "예문: "+w.example;
+    ex.style.display="block";
+  }
+  grade(opt.correct ? 4 : 0);
 }
 
 function grade(quality){
@@ -379,12 +414,8 @@ function grade(quality){
   } else {
     studyQueue.splice(curIdx % studyQueue.length,1);
   }
-  renderCard();
+  setTimeout(renderCard, 1100);
 }
-document.getElementById("gAgain").onclick=()=>grade(0);
-document.getElementById("gHard").onclick=()=>grade(3);
-document.getElementById("gGood").onclick=()=>grade(4);
-document.getElementById("gEasy").onclick=()=>grade(5);
 
 /* ============ settings ============ */
 const settingsBtn=document.getElementById("settingsBtn");

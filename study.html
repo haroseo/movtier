@@ -177,9 +177,23 @@ function jaccard(a,b){
   return inter/new Set([...sa,...sb]).size;
 }
 
-let notes = [];
-let selectedNote = null;
-let nodes=[], links=[], idSeq=0;
+const LS_NOTES = "mindweb_study_notes";
+function loadNotesFromStorage(){
+  try{
+    const raw = JSON.parse(localStorage.getItem(LS_NOTES) || "null");
+    if(raw && Array.isArray(raw.notes)) return raw;
+  }catch(e){}
+  return {notes:[], idSeq:0};
+}
+function saveNotesToStorage(){
+  localStorage.setItem(LS_NOTES, JSON.stringify({notes, idSeq}));
+}
+
+const _stored = loadNotesFromStorage();
+let notes = _stored.notes;
+let selectedNote = notes.length ? notes[0].id : null;
+let idSeq = _stored.idSeq;
+let nodes=[], links=[];
 
 function renderNoteList(){
   const list=document.getElementById("noteList");
@@ -193,6 +207,21 @@ function renderNoteList(){
     el.className="noteItem"+(n.id===selectedNote?" sel":"");
     el.innerHTML=`<div class="t">${n.title||"제목 없음"}</div><div class="m">${n.synced?"🔗 동기화됨":"독립 노트"}</div>`;
     el.onclick=()=>{ saveCurrentNote(); selectedNote=n.id; loadNote(); };
+    const del=document.createElement("span");
+    del.textContent="✕"; del.title="노트 삭제";
+    del.style.cssText="position:absolute;top:8px;right:8px;color:var(--muted);font-size:11px;cursor:pointer;display:none;";
+    el.style.position="relative";
+    el.appendChild(del);
+    el.addEventListener("mouseenter",()=>del.style.display="block");
+    el.addEventListener("mouseleave",()=>del.style.display="none");
+    del.onclick=(ev)=>{
+      ev.stopPropagation();
+      if(!confirm(`"${n.title||'제목 없음'}" 노트를 삭제할까요?`)) return;
+      notes = notes.filter(x=>x.id!==n.id);
+      if(selectedNote===n.id) selectedNote = notes.length ? notes[0].id : null;
+      saveNotesToStorage();
+      loadNote();
+    };
     list.appendChild(el);
   });
 }
@@ -201,6 +230,7 @@ function saveCurrentNote(){
   if(!n) return;
   n.title = document.getElementById("noteTitle").value;
   n.body = document.getElementById("noteEditor").innerText;
+  saveNotesToStorage();
 }
 function loadNote(){
   const n = notes.find(n=>n.id===selectedNote);
@@ -232,18 +262,26 @@ function renderChips(n){
   });
 }
 
-document.getElementById("newNoteBtn").onclick=()=>{
+function createNote(){
   saveCurrentNote();
   const id="note"+(idSeq++ + 100);
   notes.unshift({id,title:"새 노트",body:"",synced:true});
-  selectedNote=id; loadNote();
+  selectedNote=id;
+  saveNotesToStorage();
+  loadNote();
   document.getElementById("noteTitle").focus();
-};
+}
+document.getElementById("newNoteBtn").onclick=createNote;
+document.addEventListener("keydown", e=>{
+  if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==="n"){ e.preventDefault(); createNote(); }
+});
 document.getElementById("noteTitle").addEventListener("input", saveCurrentNote);
-document.getElementById("noteEditor").addEventListener("input", ()=>{ saveCurrentNote(); const n=notes.find(n=>n.id===selectedNote); renderChips(n); });
+document.getElementById("noteEditor").addEventListener("input", ()=>{ saveCurrentNote(); const n=notes.find(n=>n.id===selectedNote); if(n) renderChips(n); });
 document.getElementById("syncBtn").onclick=(e)=>{
   const n = notes.find(n=>n.id===selectedNote);
+  if(!n) return;
   n.synced = !n.synced;
+  saveNotesToStorage();
   e.target.classList.toggle("on", n.synced);
   renderNoteList(); renderChips(n);
 };
@@ -266,10 +304,11 @@ document.getElementById("tabGraph").onclick=()=>{
 
 // build mindmap nodes from synced notes
 function syncGraphFromNotes(){
-  nodes=[]; links=[]; idSeq=0;
+  nodes=[]; links=[];
+  let gid=0;
   notes.filter(n=>n.synced).forEach(n=>{
     const kws = keywordsOf(n.title+" "+n.body);
-    const node = {id:"n"+(idSeq++), label:n.title, keywords:kws, ref:false};
+    const node = {id:"g"+(gid++), label:n.title, keywords:kws, ref:false};
     nodes.forEach(other=>{
       const score = jaccard(kws, other.keywords);
       if(score>0.1) links.push({source:other.id, target:node.id, ref:false});
@@ -360,7 +399,9 @@ document.getElementById("ocrFile").addEventListener("change", async (e)=>{
     const id="note"+(idSeq++ + 200);
     const title = clean.split("\n")[0].slice(0,30) || "사진에서 가져온 노트";
     notes.unshift({id, title, body:clean, synced:true});
-    selectedNote=id; loadNote();
+    selectedNote=id;
+    saveNotesToStorage();
+    loadNote();
     status.textContent="완료! 노트로 정리했어요.";
     setTimeout(()=>ocrOverlay.classList.remove("show"),700);
   }catch(err){
