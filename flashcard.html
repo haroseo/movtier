@@ -8,18 +8,21 @@
   :root{
     --bg:#fafaf9; --panel:#ffffff; --border:#e8e6e1; --text:#1f1d1a; --muted:#8b8778;
     --violet:#6c5ce7; --violet-bg:#e9e5fb; --gold:#d89a3d; --gold-bg:#faf0dd;
-    --green:#38a06b; --green-bg:#e0f3e8; --red:#d45454; --red-bg:#fbe4e4;
+    --green:#38a06b; --green-bg:#e0f3e8; --red:#d45454; --red-bg:#fbe4e4; --blue:#3b6fd8; --blue-bg:#e4ecfb;
     --font: "Pretendard","Inter",-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   }
   [data-theme="dark"]{ --bg:#17171b; --panel:#1e1e23; --border:#2c2c34; --text:#eeecee; --muted:#8f8d9b;
-    --violet-bg:#2a2540; --gold-bg:#332a17; --green-bg:#163325; --red-bg:#33201f; }
+    --violet-bg:#2a2540; --gold-bg:#332a17; --green-bg:#163325; --red-bg:#33201f; --blue-bg:#1c2740; }
   [data-theme="mono"]{ --bg:#ffffff; --panel:#f2f2f2; --border:#d8d8d8; --text:#111111; --muted:#767676;
-    --violet:#111111; --violet-bg:#eaeaea; --gold:#444444; --gold-bg:#eeeeee; --green:#222; --green-bg:#e9e9e9; --red:#555; --red-bg:#e5e5e5;}
+    --violet:#111111; --violet-bg:#eaeaea; --gold:#444444; --gold-bg:#eeeeee; --green:#222; --green-bg:#e9e9e9;
+    --red:#555; --red-bg:#e5e5e5; --blue:#333; --blue-bg:#e9e9e9;}
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;font-size:14px;}
-  #topbar{height:72px;min-height:72px;border-bottom:1px solid var(--border);background:var(--panel);
-    display:flex;align-items:center;gap:14px;padding:0 28px;}
-  .brand{font-weight:700;color:var(--violet);display:flex;align-items:center;gap:8px;white-space:nowrap;}
+  ::-webkit-scrollbar{width:8px;} ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+
+  #topbar{height:68px;min-height:68px;border-bottom:1px solid var(--border);background:var(--panel);
+    display:flex;align-items:center;gap:14px;padding:0 26px;}
+  .brand{font-weight:700;color:var(--violet);display:flex;align-items:center;gap:8px;white-space:nowrap;cursor:pointer;}
   .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--violet);}
   .spacer{flex:1;}
   .pill{display:flex;align-items:center;gap:6px;padding:9px 15px;border-radius:999px;font-size:12.5px;font-weight:600;
@@ -29,26 +32,47 @@
   .pill.ghost{background:var(--bg);color:var(--text);border-color:var(--border);}
   #settingsBtn{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:var(--panel);cursor:pointer;}
 
-  #stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;position:relative;}
-  #cardWrap{width:560px;max-width:88vw;height:340px;perspective:1200px;}
-  #card{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform .45s cubic-bezier(.2,.8,.3,1);cursor:pointer;}
+  /* ---------- Deck picker ---------- */
+  #pickerView{flex:1;overflow-y:auto;padding:56px 24px;display:flex;flex-direction:column;align-items:center;gap:44px;}
+  #pickerView h1{font-size:24px;font-weight:800;}
+  #pickerView .sub{color:var(--muted);font-size:13.5px;text-align:center;max-width:480px;}
+  .deckGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;max-width:900px;width:100%;}
+  .deckCard{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;cursor:pointer;
+    display:flex;flex-direction:column;gap:8px;transition:transform .15s,border-color .15s;}
+  .deckCard:hover{transform:translateY(-2px);border-color:var(--violet);}
+  .deckCard .lvl{align-self:flex-start;padding:4px 10px;border-radius:999px;font-size:10.5px;font-weight:700;}
+  .deckCard h3{font-size:15.5px;font-weight:700;}
+  .deckCard p{font-size:12px;color:var(--muted);line-height:1.5;}
+  .deckCard .cnt{font-size:11px;color:var(--muted);margin-top:auto;}
+  .importRow{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;max-width:900px;}
+  .importBtn{background:var(--panel);border:1px dashed var(--border);border-radius:14px;padding:18px 24px;
+    cursor:pointer;font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:10px;font-family:var(--font);}
+  .importBtn:hover{border-color:var(--violet);color:var(--violet);}
+
+  /* ---------- Study view ---------- */
+  #studyView{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;gap:24px;position:relative;}
+  #dueInfo{position:absolute;top:20px;left:26px;font-size:12px;color:var(--muted);}
+  #cardWrap{width:560px;max-width:88vw;height:320px;perspective:1200px;}
+  #card{width:100%;height:100%;position:relative;transform-style:preserve-3d;transition:transform .4s cubic-bezier(.2,.8,.3,1);cursor:pointer;}
   #card.flipped{transform:rotateY(180deg);}
   .face{position:absolute;inset:0;backface-visibility:hidden;border:1px solid var(--border);border-radius:20px;
-    background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px;}
+    background:var(--panel);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:36px;}
   .face.back{transform:rotateY(180deg);}
-  .tag{padding:6px 14px;border-radius:999px;background:var(--gold-bg);color:var(--gold);font-size:11.5px;font-weight:700;}
-  .word{font-size:38px;font-weight:800;text-align:center;}
-  .meta{font-size:13px;color:var(--muted);}
-  .hint{font-size:11.5px;color:var(--muted);margin-top:6px;}
-  .meaning{font-size:24px;font-weight:700;text-align:center;}
-  .example{font-size:13px;color:var(--muted);text-align:center;max-width:420px;}
+  .tag{padding:6px 14px;border-radius:999px;background:var(--gold-bg);color:var(--gold);font-size:11px;font-weight:700;}
+  .word{font-size:36px;font-weight:800;text-align:center;}
+  .meta{font-size:12.5px;color:var(--muted);}
+  .hint{font-size:11px;color:var(--muted);margin-top:4px;}
+  .meaning{font-size:22px;font-weight:700;text-align:center;}
+  .example{font-size:12.5px;color:var(--muted);text-align:center;max-width:420px;}
+  #gradeRow{display:flex;gap:10px;width:560px;max-width:88vw;}
+  .gradebtn{flex:1;padding:14px 6px;border-radius:12px;border:none;font-weight:700;font-size:12.5px;cursor:pointer;font-family:var(--font);}
+  .gradebtn.again{background:var(--red-bg);color:var(--red);}
+  .gradebtn.hard{background:var(--gold-bg);color:var(--gold);}
+  .gradebtn.good{background:var(--blue-bg);color:var(--blue);}
+  .gradebtn.easy{background:var(--green-bg);color:var(--green);}
+  .gradebtn small{display:block;font-weight:400;opacity:.75;font-size:10px;margin-top:2px;}
 
-  #answerRow{display:flex;gap:16px;width:560px;max-width:88vw;}
-  .bigbtn{flex:1;padding:16px;border-radius:12px;border:none;font-weight:700;font-size:14px;cursor:pointer;font-family:var(--font);}
-  .bigbtn.red{background:var(--red-bg);color:var(--red);}
-  .bigbtn.green{background:var(--green-bg);color:var(--green);}
-
-  #settingsPanel{position:absolute;top:80px;right:28px;background:var(--panel);border:1px solid var(--border);
+  #settingsPanel{position:absolute;top:78px;right:26px;background:var(--panel);border:1px solid var(--border);
     border-radius:12px;padding:18px;box-shadow:0 8px 24px rgba(0,0,0,.12);display:none;z-index:50;width:230px;}
   #settingsPanel.show{display:block;}
   #settingsPanel h4{font-size:12px;color:var(--muted);margin-bottom:8px;}
@@ -60,43 +84,58 @@
     color:var(--text);cursor:pointer;font-size:11px;font-family:var(--font);}
   .themeRow button.active{background:var(--violet);color:#fff;border-color:var(--violet);}
 
-  #ocrOverlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:100;}
-  #ocrOverlay.show{display:flex;}
-  #ocrBox{background:var(--panel);border-radius:16px;padding:28px;width:420px;text-align:center;}
-  #ocrBox input{margin:14px 0;}
-  #ocrStatus{font-size:12.5px;color:var(--muted);margin-top:10px;}
-  #ocrBox button.cancel{margin-top:12px;background:none;border:none;color:var(--muted);cursor:pointer;font-family:var(--font);}
-  #ocrBox .tip{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5;}
+  #ocrOverlay,#fileOverlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;z-index:100;}
+  #ocrOverlay.show,#fileOverlay.show{display:flex;}
+  .modalBox{background:var(--panel);border-radius:16px;padding:28px;width:420px;text-align:center;}
+  .modalBox input{margin:14px 0;}
+  .modalStatus{font-size:12.5px;color:var(--muted);margin-top:10px;}
+  .modalBox button.cancel{margin-top:12px;background:none;border:none;color:var(--muted);cursor:pointer;font-family:var(--font);}
+  .modalBox .tip{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5;}
 </style>
 </head>
 <body data-theme="light">
 
 <div id="topbar">
-  <div class="brand"><span class="dot"></span>암기 카드</div>
+  <div class="brand" id="brandHome"><span class="dot"></span>암기 카드</div>
   <div class="spacer"></div>
-  <div class="pill violet" id="statsPill">오늘 0개 · 정답률 —</div>
-  <button class="pill gold" id="ocrBtn">📷 사진으로 단어 추가</button>
+  <div id="statsWrap"></div>
+  <button class="pill gold" id="ocrBtn">📷 사진으로 추가</button>
   <button id="settingsBtn">⚙</button>
 </div>
 
-<div id="stage">
+<div id="pickerView">
+  <div style="text-align:center;">
+    <h1>어떤 덱으로 시작할까요?</h1>
+    <div class="sub">수준별 영단어, 단어장 스타일(Unit별), 또는 직접 파일을 불러와서 시작할 수 있어요. SM-2 간격 반복 알고리즘으로 복습 시점을 자동으로 계산해요.</div>
+  </div>
+  <div class="deckGrid" id="deckGrid"></div>
+  <div class="importRow">
+    <button class="importBtn" id="importFileBtn">📁 파일로 불러오기 (CSV / TXT / JSON)</button>
+    <button class="importBtn" id="importOcrBtn">📷 사진으로 불러오기</button>
+  </div>
+</div>
+
+<div id="studyView">
+  <div id="dueInfo"></div>
   <div id="cardWrap">
     <div id="card">
       <div class="face front">
-        <div class="tag" id="frontTag">영단어 · Day 1</div>
-        <div class="word" id="frontWord">serendipity</div>
-        <div class="meta" id="frontMeta">/ˌser.ənˈdɪp.ə.ti/ · 명사</div>
+        <div class="tag" id="frontTag"></div>
+        <div class="word" id="frontWord"></div>
+        <div class="meta" id="frontMeta"></div>
         <div class="hint">카드를 클릭하면 뜻이 보여요</div>
       </div>
       <div class="face back">
-        <div class="meaning" id="backMeaning">뜻밖의 좋은 발견, 우연한 행운</div>
-        <div class="example" id="backExample">예문: Finding this cafe was pure serendipity.</div>
+        <div class="meaning" id="backMeaning"></div>
+        <div class="example" id="backExample"></div>
       </div>
     </div>
   </div>
-  <div id="answerRow">
-    <button class="bigbtn red" id="dontKnowBtn">😵 몰라요</button>
-    <button class="bigbtn green" id="knowBtn">😊 알아요</button>
+  <div id="gradeRow">
+    <button class="gradebtn again" id="gAgain">다시<small>&lt;1분</small></button>
+    <button class="gradebtn hard" id="gHard">어려움<small>1일</small></button>
+    <button class="gradebtn good" id="gGood">보통<small>3일+</small></button>
+    <button class="gradebtn easy" id="gEasy">쉬움<small>6일+</small></button>
   </div>
 </div>
 
@@ -112,69 +151,242 @@
 </div>
 
 <div id="ocrOverlay">
-  <div id="ocrBox">
+  <div class="modalBox">
     <div style="font-weight:700;margin-bottom:6px;">📷 단어장 사진 읽기</div>
-    <div style="font-size:12.5px;color:var(--muted);">단어장이나 교재 사진을 올리면 OCR로 텍스트를 읽어 자동으로 카드로 만들어요.</div>
+    <div style="font-size:12.5px;color:var(--muted);">사진을 올리면 OCR로 텍스트를 읽어 자동으로 카드로 만들어요.</div>
     <input type="file" id="ocrFile" accept="image/*">
     <div class="tip">"word - 뜻" 또는 "word: 뜻" 형식의 줄은 자동으로 단어/뜻이 나뉘어요.</div>
-    <div id="ocrStatus"></div>
+    <div class="modalStatus" id="ocrStatus"></div>
     <button class="cancel" id="ocrCancel">닫기</button>
   </div>
 </div>
 
+<div id="fileOverlay">
+  <div class="modalBox">
+    <div style="font-weight:700;margin-bottom:6px;">📁 파일로 덱 불러오기</div>
+    <div style="font-size:12.5px;color:var(--muted);">CSV(word,meaning), TXT(word - meaning 줄바꿈), JSON([{word,meaning}]) 형식을 지원해요.</div>
+    <input type="file" id="deckFile" accept=".csv,.txt,.json">
+    <div class="modalStatus" id="fileStatus"></div>
+    <button class="cancel" id="fileCancel">닫기</button>
+  </div>
+</div>
+
 <script>
-let deck = [];
-let cur = 0, todayCount = 0, correctCount = 0;
+/* ============ Built-in decks (curated, real common-word lists by level) ============ */
+const BUILTIN_DECKS = {
+  beginner: { name:"왕초보", desc:"CEFR A1 수준의 가장 기본적인 생활 단어", color:"green",
+    words:[
+      ["apple","/ˈæp.əl/","명사","사과","I eat an apple every morning."],
+      ["book","/bʊk/","명사","책","She is reading a book."],
+      ["happy","/ˈhæp.i/","형용사","행복한","He looks very happy today."],
+      ["water","/ˈwɔː.tɚ/","명사","물","Can I have some water?"],
+      ["friend","/frend/","명사","친구","He is my best friend."],
+      ["run","/rʌn/","동사","달리다","They run in the park every day."],
+      ["big","/bɪɡ/","형용사","큰","That is a big house."],
+      ["school","/skuːl/","명사","학교","I go to school by bus."],
+      ["like","/laɪk/","동사","좋아하다","I like coffee."],
+      ["family","/ˈfæm.əl.i/","명사","가족","My family is small."],
+    ]},
+  elementary: { name:"초급", desc:"CEFR A2 수준의 일상 회화 단어", color:"blue",
+    words:[
+      ["decide","/dɪˈsaɪd/","동사","결정하다","We need to decide soon."],
+      ["improve","/ɪmˈpruːv/","동사","향상시키다","She wants to improve her English."],
+      ["opinion","/əˈpɪn.jən/","명사","의견","What's your opinion on this?"],
+      ["compare","/kəmˈper/","동사","비교하다","Compare the two options."],
+      ["explain","/ɪkˈspleɪn/","동사","설명하다","Can you explain this again?"],
+      ["habit","/ˈhæb.ɪt/","명사","습관","Reading is a good habit."],
+      ["avoid","/əˈvɔɪd/","동사","피하다","Try to avoid junk food."],
+      ["environment","/ɪnˈvaɪ.rən.mənt/","명사","환경","We must protect the environment."],
+      ["achieve","/əˈtʃiːv/","동사","성취하다","She achieved her goal."],
+      ["polite","/pəˈlaɪt/","형용사","예의 바른","He is always polite."],
+    ]},
+  intermediate: { name:"중급", desc:"CEFR B1~B2 수준의 시사·학업 단어", color:"gold",
+    words:[
+      ["ambiguous","/æmˈbɪɡ.ju.əs/","형용사","모호한","The instructions were ambiguous."],
+      ["substantial","/səbˈstæn.ʃəl/","형용사","상당한","There was a substantial increase in sales."],
+      ["consequence","/ˈkɑːn.sə.kwens/","명사","결과","Every action has a consequence."],
+      ["negotiate","/nɪˈɡoʊ.ʃi.eɪt/","동사","협상하다","They negotiated a new contract."],
+      ["inevitable","/ɪˈnev.ə.tə.bəl/","형용사","불가피한","Change is inevitable."],
+      ["contradict","/ˌkɑːn.trəˈdɪkt/","동사","모순되다","His actions contradict his words."],
+      ["allocate","/ˈæl.ə.keɪt/","동사","할당하다","We allocated funds for research."],
+      ["skeptical","/ˈskep.tɪ.kəl/","형용사","회의적인","She is skeptical about the plan."],
+      ["comprehensive","/ˌkɑːm.prɪˈhen.sɪv/","형용사","포괄적인","This is a comprehensive report."],
+      ["justify","/ˈdʒʌs.tə.faɪ/","동사","정당화하다","Can you justify this decision?"],
+    ]},
+  advanced: { name:"고급", desc:"CEFR C1 이상, 학술·비즈니스 고급 어휘", color:"violet",
+    words:[
+      ["ubiquitous","/juːˈbɪk.wɪ.təs/","형용사","어디에나 있는","Smartphones are ubiquitous today."],
+      ["ephemeral","/ɪˈfem.ər.əl/","형용사","일시적인","Fame can be ephemeral."],
+      ["pragmatic","/præɡˈmæt.ɪk/","형용사","실용적인","We need a pragmatic solution."],
+      ["scrutiny","/ˈskruː.tən.i/","명사","면밀한 검토","The proposal is under scrutiny."],
+      ["paradigm","/ˈper.ə.daɪm/","명사","패러다임","This is a paradigm shift."],
+      ["meticulous","/məˈtɪk.jə.ləs/","형용사","꼼꼼한","She is meticulous about details."],
+      ["cohesive","/koʊˈhiː.sɪv/","형용사","응집력 있는","The team is very cohesive."],
+      ["discern","/dɪˈsɝːn/","동사","식별하다","It's hard to discern the truth."],
+      ["mitigate","/ˈmɪt̬.ɪ.ɡeɪt/","동사","완화하다","Steps were taken to mitigate risk."],
+      ["arbitrary","/ˈɑːr.bə.trer.i/","형용사","임의적인","The rule seemed arbitrary."],
+    ]},
+};
+const BOOK_UNITS = [
+  { title:"Unit 1 · 여행", words:[
+    ["itinerary","/aɪˈtɪn.ə.rer.i/","명사","여행 일정","Here is our travel itinerary."],
+    ["accommodation","/əˌkɑː.məˈdeɪ.ʃən/","명사","숙박시설","We booked accommodation near the beach."],
+    ["departure","/dɪˈpɑːr.tʃɚ/","명사","출발","The departure time is 9 AM."],
+  ]},
+  { title:"Unit 2 · 비즈니스", words:[
+    ["revenue","/ˈrev.ə.nuː/","명사","수익","Revenue grew by 10% this year."],
+    ["negotiation","/nɪˌɡoʊ.ʃiˈeɪ.ʃən/","명사","협상","The negotiation lasted three hours."],
+    ["stakeholder","/ˈsteɪk.hoʊl.dɚ/","명사","이해관계자","All stakeholders were informed."],
+  ]},
+  { title:"Unit 3 · 과학", words:[
+    ["hypothesis","/haɪˈpɑː.θə.sɪs/","명사","가설","We tested our hypothesis."],
+    ["variable","/ˈver.i.ə.bəl/","명사","변수","Control the variables in the experiment."],
+    ["empirical","/ɪmˈpɪr.ɪ.kəl/","형용사","경험적인","This is based on empirical data."],
+  ]},
+];
+
+/* ============ storage / SM-2 ============ */
+const LS_PREFIX = "mindweb_flashcard_";
+function loadProgress(deckId){ try{ return JSON.parse(localStorage.getItem(LS_PREFIX+"progress_"+deckId)||"{}"); }catch(e){ return {}; } }
+function saveProgress(deckId, p){ localStorage.setItem(LS_PREFIX+"progress_"+deckId, JSON.stringify(p)); }
+
+// SM-2: quality 0(again) 3(hard) 4(good) 5(easy)
+function sm2(card, quality){
+  if(!card.ease) card.ease = 2.5;
+  if(!card.reps) card.reps = 0;
+  if(!card.interval) card.interval = 0;
+  if(quality < 3){
+    card.reps = 0;
+    card.interval = 0; // due again within the same session (<1 day)
+  } else {
+    if(card.reps===0) card.interval = 1;
+    else if(card.reps===1) card.interval = 6;
+    else card.interval = Math.round(card.interval * card.ease);
+    card.reps += 1;
+  }
+  card.ease = Math.max(1.3, card.ease + (0.1 - (5-quality)*(0.08+(5-quality)*0.02)));
+  card.due = Date.now() + card.interval*24*60*60*1000;
+  return card;
+}
+
+/* ============ state ============ */
+let currentDeckId = null;
+let currentWords = [];   // [{word,pron,pos,meaning,example}]
+let progress = {};       // key: word -> {ease,reps,interval,due}
+let studyQueue = [];      // indices due now
+let curIdx = 0;
+
+function keyOf(w){ return w.word.toLowerCase(); }
+
+function renderDeckPicker(){
+  const grid=document.getElementById("deckGrid");
+  grid.innerHTML="";
+  Object.entries(BUILTIN_DECKS).forEach(([id,d])=>{
+    const el=document.createElement("div"); el.className="deckCard";
+    el.innerHTML=`<span class="lvl" style="background:var(--${d.color}-bg);color:var(--${d.color});">${d.name}</span>
+      <h3>${d.name} 단어</h3><p>${d.desc}</p><div class="cnt">${d.words.length}개 단어</div>`;
+    el.onclick=()=>loadDeck(id, d.words.map(w=>toWordObj(w)), d.name);
+    grid.appendChild(el);
+  });
+  const bookEl=document.createElement("div"); bookEl.className="deckCard";
+  const totalBook = BOOK_UNITS.reduce((a,u)=>a+u.words.length,0);
+  bookEl.innerHTML=`<span class="lvl" style="background:var(--gold-bg);color:var(--gold);">단어장</span>
+    <h3>Unit별 단어장</h3><p>영단어책처럼 주제별 Unit으로 묶인 어휘</p><div class="cnt">${BOOK_UNITS.length}개 Unit · ${totalBook}개 단어</div>`;
+  bookEl.onclick=()=>{
+    const all = BOOK_UNITS.flatMap(u=>u.words.map(w=>({...toWordObj(w), unit:u.title})));
+    loadDeck("book_all", all, "단어장 (전체 Unit)");
+  };
+  grid.appendChild(bookEl);
+}
+function toWordObj(arr){
+  return {word:arr[0], pron:arr[1], pos:arr[2], meaning:arr[3], example:arr[4]||""};
+}
+
+function loadDeck(id, words, label){
+  currentDeckId = id;
+  currentWords = words;
+  progress = loadProgress(id);
+  words.forEach(w=>{
+    const k=keyOf(w);
+    if(!progress[k]) progress[k] = {ease:2.5, reps:0, interval:0, due:0};
+  });
+  saveProgress(id, progress);
+  document.getElementById("pickerView").style.display="none";
+  document.getElementById("studyView").style.display="flex";
+  buildQueue();
+  renderCard();
+}
+function backToPicker(){
+  document.getElementById("studyView").style.display="none";
+  document.getElementById("pickerView").style.display="flex";
+  document.getElementById("statsWrap").innerHTML="";
+}
+document.getElementById("brandHome").onclick=backToPicker;
+
+function buildQueue(){
+  const now=Date.now();
+  const due=[], fresh=[];
+  currentWords.forEach((w,i)=>{
+    const p = progress[keyOf(w)];
+    if(p.reps===0) fresh.push(i);
+    else if(p.due<=now) due.push(i);
+  });
+  studyQueue = due.concat(fresh);
+  curIdx = 0;
+  updateDueInfo();
+}
+function updateDueInfo(){
+  document.getElementById("dueInfo").textContent = `오늘 복습 ${studyQueue.length}개 남음 · 전체 ${currentWords.length}개`;
+  const doneToday = currentWords.length - studyQueue.length;
+  document.getElementById("statsWrap").innerHTML = `<span class="pill violet">${currentDeckId?currentDeckId:''} · 남은 ${studyQueue.length}개</span>`;
+}
 
 const card=document.getElementById("card");
+card.onclick=()=>{ if(studyQueue.length) card.classList.toggle("flipped"); };
+
 function renderCard(){
-  if(deck.length===0){
+  updateDueInfo();
+  if(studyQueue.length===0){
+    document.getElementById("frontTag").textContent="완료";
+    document.getElementById("frontWord").textContent="오늘 복습을 다 마쳤어요 🎉";
+    document.getElementById("frontMeta").textContent="다른 덱을 선택하거나 나중에 다시 와주세요";
+    document.getElementById("backMeaning").textContent="";
+    document.getElementById("backExample").textContent="";
     card.classList.remove("flipped");
-    document.getElementById("frontTag").textContent = "카드 없음";
-    document.getElementById("frontWord").textContent = "아직 단어가 없어요";
-    document.getElementById("frontMeta").textContent = "📷 사진으로 단어 추가로 시작해보세요";
-    document.getElementById("backMeaning").textContent = "";
-    document.getElementById("backExample").textContent = "";
-    card.style.cursor="default";
-    document.getElementById("knowBtn").disabled=true;
-    document.getElementById("dontKnowBtn").disabled=true;
-    document.getElementById("knowBtn").style.opacity=.4;
-    document.getElementById("dontKnowBtn").style.opacity=.4;
     return;
   }
-  card.style.cursor="pointer";
-  document.getElementById("knowBtn").disabled=false;
-  document.getElementById("dontKnowBtn").disabled=false;
-  document.getElementById("knowBtn").style.opacity=1;
-  document.getElementById("dontKnowBtn").style.opacity=1;
-  const c = deck[cur % deck.length];
+  const w = currentWords[studyQueue[curIdx % studyQueue.length]];
   card.classList.remove("flipped");
-  document.getElementById("frontTag").textContent = `영단어 · ${cur+1}/${deck.length}`;
-  document.getElementById("frontWord").textContent = c.word;
-  document.getElementById("frontMeta").textContent = `${c.pron||""} ${c.pos?"· "+c.pos:""}`;
-  document.getElementById("backMeaning").textContent = c.meaning || "뜻을 아직 몰라요 — 직접 입력해보세요";
-  document.getElementById("backExample").textContent = c.example ? "예문: "+c.example : "";
+  document.getElementById("frontTag").textContent = w.unit ? w.unit : "영단어";
+  document.getElementById("frontWord").textContent = w.word;
+  document.getElementById("frontMeta").textContent = `${w.pron||""} ${w.pos?"· "+w.pos:""}`;
+  document.getElementById("backMeaning").textContent = w.meaning || "뜻 입력 필요";
+  document.getElementById("backExample").textContent = w.example ? "예문: "+w.example : "";
 }
-card.onclick=()=>{ if(deck.length) card.classList.toggle("flipped"); };
 
-function nextCard(known){
-  todayCount++;
-  if(known) correctCount++;
-  document.getElementById("statsPill").textContent = `오늘 ${todayCount}개 · 정답률 ${Math.round(correctCount/todayCount*100)}%`;
-  if(!known){
-    // requeue this word a few slots later (simple spaced repetition)
-    const c = deck.splice(cur%deck.length,1)[0];
-    const insertAt = Math.min(deck.length, (cur%deck.length)+3);
-    deck.splice(insertAt,0,c);
+function grade(quality){
+  if(studyQueue.length===0) return;
+  const idx = studyQueue[curIdx % studyQueue.length];
+  const w = currentWords[idx];
+  const k = keyOf(w);
+  sm2(progress[k], quality);
+  saveProgress(currentDeckId, progress);
+  if(quality<3){
+    // requeue soon within this session
+    const removed = studyQueue.splice(curIdx % studyQueue.length,1)[0];
+    const insertAt = Math.min(studyQueue.length, (curIdx%Math.max(studyQueue.length,1))+3);
+    studyQueue.splice(insertAt,0,removed);
   } else {
-    cur++;
+    studyQueue.splice(curIdx % studyQueue.length,1);
   }
   renderCard();
 }
-document.getElementById("knowBtn").onclick=()=>nextCard(true);
-document.getElementById("dontKnowBtn").onclick=()=>nextCard(false);
+document.getElementById("gAgain").onclick=()=>grade(0);
+document.getElementById("gHard").onclick=()=>grade(3);
+document.getElementById("gGood").onclick=()=>grade(4);
+document.getElementById("gEasy").onclick=()=>grade(5);
 
-// settings
+/* ============ settings ============ */
 const settingsBtn=document.getElementById("settingsBtn");
 const settingsPanel=document.getElementById("settingsPanel");
 settingsBtn.onclick=()=>settingsPanel.classList.toggle("show");
@@ -199,11 +411,46 @@ accents.forEach((c,i)=>{
   swatchRow.appendChild(s);
 });
 
-// OCR word capture (client-side OCR engine, no AI/LLM)
-const ocrBtn=document.getElementById("ocrBtn");
-const ocrOverlay=document.getElementById("ocrOverlay");
-ocrBtn.onclick=()=>ocrOverlay.classList.add("show");
-document.getElementById("ocrCancel").onclick=()=>ocrOverlay.classList.remove("show");
+/* ============ file import ============ */
+document.getElementById("importFileBtn").onclick=()=>document.getElementById("fileOverlay").classList.add("show");
+document.getElementById("fileCancel").onclick=()=>document.getElementById("fileOverlay").classList.remove("show");
+document.getElementById("deckFile").addEventListener("change", async (e)=>{
+  const file=e.target.files[0];
+  if(!file) return;
+  const status=document.getElementById("fileStatus");
+  const text = await file.text();
+  let words=[];
+  try{
+    if(file.name.endsWith(".json")){
+      const data = JSON.parse(text);
+      words = data.map(d=>({word:d.word, pron:d.pron||"", pos:d.pos||"", meaning:d.meaning||"", example:d.example||""}));
+    } else if(file.name.endsWith(".csv")){
+      text.split("\n").map(l=>l.trim()).filter(Boolean).forEach(line=>{
+        const parts = line.split(",").map(s=>s.trim());
+        if(parts[0] && parts[1]) words.push({word:parts[0], pron:"", pos:parts[3]||"", meaning:parts[1], example:parts[2]||""});
+      });
+    } else {
+      text.split("\n").map(l=>l.trim()).filter(Boolean).forEach(line=>{
+        const sep = line.includes(" - ") ? " - " : line.includes(":") ? ":" : null;
+        if(sep){
+          const [w,m] = line.split(sep);
+          if(w && m) words.push({word:w.trim(), pron:"", pos:"", meaning:m.trim(), example:""});
+        }
+      });
+    }
+  }catch(err){ status.textContent="파일을 읽지 못했어요. 형식을 확인해주세요."; return; }
+  if(words.length===0){ status.textContent="단어를 찾지 못했어요."; return; }
+  status.textContent=`${words.length}개 단어를 불러왔어요!`;
+  setTimeout(()=>{
+    document.getElementById("fileOverlay").classList.remove("show");
+    loadDeck("custom_"+Date.now(), words, file.name);
+  },700);
+});
+
+/* ============ OCR import (client-side OCR engine, no AI/LLM) ============ */
+document.getElementById("importOcrBtn").onclick=()=>document.getElementById("ocrOverlay").classList.add("show");
+document.getElementById("ocrBtn").onclick=()=>document.getElementById("ocrOverlay").classList.add("show");
+document.getElementById("ocrCancel").onclick=()=>document.getElementById("ocrOverlay").classList.remove("show");
 document.getElementById("ocrFile").addEventListener("change", async (e)=>{
   const file=e.target.files[0];
   if(!file) return;
@@ -214,25 +461,35 @@ document.getElementById("ocrFile").addEventListener("change", async (e)=>{
       logger: m => { if(m.status==='recognizing text') status.textContent = `인식 중… ${Math.round(m.progress*100)}%`; }
     });
     const lines = text.split("\n").map(l=>l.trim()).filter(Boolean);
-    let added = 0;
+    let words=[];
     lines.forEach(line=>{
       const sep = line.includes(" - ") ? " - " : line.includes(":") ? ":" : null;
       if(sep){
         const [w,m] = line.split(sep);
-        if(w && m){ deck.push({word:w.trim(), pron:"", pos:"", meaning:m.trim(), example:""}); added++; }
+        if(w && m) words.push({word:w.trim(), pron:"", pos:"", meaning:m.trim(), example:""});
       } else if(/^[A-Za-z\-']{2,}$/.test(line)){
-        deck.push({word:line, pron:"", pos:"", meaning:"뜻 입력 필요", example:""});
-        added++;
+        words.push({word:line, pron:"", pos:"", meaning:"뜻 입력 필요", example:""});
       }
     });
-    status.textContent = added>0 ? `${added}개 단어를 카드로 추가했어요!` : "단어를 찾지 못했어요. 더 선명한 사진으로 시도해보세요.";
-    if(added>0) setTimeout(()=>{ ocrOverlay.classList.remove("show"); renderCard(); },900);
+    if(words.length===0){ status.textContent="단어를 찾지 못했어요."; return; }
+    status.textContent = `${words.length}개 단어를 카드로 추가했어요!`;
+    setTimeout(()=>{
+      document.getElementById("ocrOverlay").classList.remove("show");
+      if(currentDeckId){
+        // add into current deck session
+        words.forEach(w=>{ currentWords.push(w); progress[keyOf(w)] = {ease:2.5,reps:0,interval:0,due:0}; });
+        saveProgress(currentDeckId, progress);
+        buildQueue(); renderCard();
+      } else {
+        loadDeck("custom_ocr_"+Date.now(), words, "사진에서 가져온 덱");
+      }
+    },700);
   }catch(err){
     status.textContent="이미지를 읽지 못했어요.";
   }
 });
 
-renderCard();
+renderDeckPicker();
 </script>
 </body>
 </html>
